@@ -1,0 +1,135 @@
+---
+title: "Untitled"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(ggplot2)
+library(gridExtra)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r}
+load("dataset1.Rdata")
+dataset1=export
+load("dataset2.Rdata")
+dataset2=export
+newdata1=dataset1
+for (j in (1:length(dataset1[,1]))){
+  newdata1[j,26]=substr(dataset1[j,26], 1, 10)
+}
+newdata2=dataset2
+for (j in (1:length(dataset2[,1]))){
+  newdata2[j,13]=substr(dataset2[j,13], 1, 10)
+}
+
+```
+
+```{r}
+ind=c(1:365)
+Keyword =c()
+Total_articles=c()
+all_dates=unique(newdata1$Date)
+for (k in 1:365) {
+  Sum <- 0
+  specific_date <- all_dates[k]
+  filtered_data <- dataset1[newdata1$Date == specific_date, ]
+  
+  for (i in 1:length(filtered_data[, 2])) {
+    if (filtered_data[i, 18] > 0) {
+     Sum <- Sum + 1
+   }
+}
+  
+Keyword <- c(Keyword, Sum)
+Total_articles <- c(Total_articles, length(filtered_data[, 2]))
+}
+#Code above filters by date and counts how many keywords are present and has a count fir them
+#set.seed(4508)
+N=20000
+X0=rbeta(N,1,Total_articles[1]-1,ncp = 0)
+p=rbinom(N, size = 1, 1/50)
+mu=array(0,c(365,1))
+mu_nm=array(0,c(365,1))
+Jump=array(0,c(365,1))
+Jump_UD=array(0,c(365,1))
+Sig=array(0,c(365,1))
+H=matrix(0,200,365)
+W0 = array(0,c(10000,1))
+for (z in 1:364){
+  for (k in 1:N){
+    W0[k]=dbinom(Keyword[z],Total_articles[z],X0[k])
+  }
+  y0=sum(W0)
+  W0=W0/y0#Assigns and normalises weights
+  Jump[z]=sum(W0*p)
+  #New_Alpha=Total_articles[z+1]*X.res
+  #New_Beta=Total_articles[z+1]-New_Alpha
+  New_Alpha_v=Keyword[z+1]
+  New_Beta_v=Total_articles[z+1]-New_Alpha_v
+  mu_nm[z]=sum(W0*X0)
+  I=sample.int(N,N,replace=TRUE,prob=W0)#Resampling particles based on weights
+  X.res=X0[I]
+  if (z>101 & z<103){
+   plot3=hist(X.res,breaks=seq(0,1,length=201))
+    plot4=hist(W0)
+    print(length(unique(X.res)))
+  }
+  Counts=hist(X.res,breaks=seq(0,1,length=201),plot=FALSE)$counts#COunts for bins of particles
+  H[,z]=Counts
+  mu[z]=mean(X.res)
+  Sig[z]=sd(X.res)
+  v=rbeta(N,10000*New_Alpha_v,10000*New_Beta_v,ncp = 0)
+  p=rbinom(N, size = 1, 1/50)
+  X1=(1-p)*X.res+p*v
+  X0=X1
+}
+mu[z+1]=mean(X.res)
+mu_nm[z+1]=sum(W0*X0)
+Sig[z+1]=sd(X.res)
+Jump[z+1]=sum(W0*p)
+image(t(H))
+```
+
+```{r}
+plot2=ggplot(Data) +
+  #geom_raster(data=reshape2::melt(t(H)),aes(x=Var1,y=Var2/100,fill=value)) +
+  #scale_fill_gradient(low="#ffffff",high="#000000")+ 
+  geom_segment(aes(x=ind,xend=ind,y=Keyword/Total_articles,yend=0),colour="blue") +
+geom_line(aes(x=ind,y=mu),colour="red")+geom_line(aes(x=ind,y=mu-Sig),colour="green")+geom_line(aes(x=ind,y=mu+Sig),colour="green")+geom_line(aes(x=ind,y=mu_nm),colour="brown")+
+
+  geom_line(aes(x=ind,y=Jump),colour="pink")+
+#+geom_line(aes(x=ind,y=mu_nm),colour="brown")+
+  scale_y_continuous(limits = c(0,0.5))#+
+ # scale_x_continuous(limits = c(200,300))+geom_line(aes(x=ind,y=Jump_UD), colour="dodgerblue")
+plot5=ggplot(Data) +
+  #geom_raster(data=reshape2::melt(t(H)),aes(x=Var1,y=Var2/100,fill=value)) +
+  #scale_fill_gradient(low="#ffffff",high="#000000")+ 
+  geom_segment(aes(x=ind,xend=ind,y=Keyword/Total_articles,yend=0),colour="blue") +
+  geom_line(aes(x=ind,y=mu),colour="red")+geom_line(aes(x=ind,y=mu-Sig),colour="green")+geom_line(aes(x=ind,y=mu+Sig),colour="green")+geom_line(aes(x=ind,y=mu_nm),colour="brown")+
+  
+  #geom_line(aes(x=ind,y=Jump),colour="pink")+
+  #+geom_line(aes(x=ind,y=mu_nm),colour="brown")+
+  scale_y_continuous(limits = c(0,0.1))+
+  labs(x = "Day",y="P.O.K")
+```
+
+
+```{r}
+plot1=ggplot(Data) +
+  geom_raster(data=reshape2::melt(t(H)),aes(x=Var1,y=Var2/100,fill=value)) +
+  scale_fill_gradient(low="#ffffff",high="#000000")+scale_y_continuous(limits = c(0,0.5))+theme(legend.position="none") 
+```
+
+```{r}
+grid.arrange(plot1,plot2,plot5,nrow=3)
+```
+
+
